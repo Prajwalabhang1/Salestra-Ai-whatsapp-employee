@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: salestra_dev
+      POSTGRES_USER: salestra
+      POSTGRES_PASSWORD: salestra_dev_password
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U salestra" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6385:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.6
+    environment:
+      # Server Config
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: http://localhost:8080
+
+      # cors 
+      CORS_ORIGIN: "*"
+      CORS_METHODS: "GET,HEAD,PUT,PATCH,POST,DELETE"
+      CORS_CREDENTIALS: "true"
+
+      # Database
+      DATABASE_ENABLED: true
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://salestra:salestra_dev_password@postgres:5432/evolution_db
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_db
+      DATABASE_SAVE_DATA_INSTANCE: true
+      DATABASE_SAVE_DATA_NEW_MESSAGE: true
+      DATABASE_SAVE_MESSAGE_UPDATE: true
+      DATABASE_SAVE_DATA_CONTACTS: true
+      DATABASE_SAVE_DATA_CHATS: true
+
+      # Authentication
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: B6D711FCDE4D4FD5936544120E713976
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: true
+
+      # Webhook
+      WEBHOOK_GLOBAL_URL: http://host.docker.internal:3000/api/webhooks/whatsapp
+      WEBHOOK_GLOBAL_ENABLED: true
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: false
+
+      # Redis Cache
+      CACHE_REDIS_ENABLED: true
+      CACHE_REDIS_URI: redis://redis:6379
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: true
+      CACHE_LOCAL_ENABLED: false
+
+      # RabbitMQ (disabled for simplicity)
+      RABBITMQ_ENABLED: false
+
+      # S3 (disabled)
+      S3_ENABLED: false
+
+      # Session Config
+      CONFIG_SESSION_PHONE_CLIENT: Salestra
+      CONFIG_SESSION_PHONE_NAME: Chrome
+
+      # QR Code
+      QRCODE_LIMIT: 60
+      QRCODE_COLOR: "#198754"
+
+      # Logs
+      LOG_LEVEL: ERROR,WARN,INFO
+      LOG_COLOR: true
+      LOG_BAILEYS: error
+
+      # Instances
+      DEL_INSTANCE: false
+      DEL_TEMP_INSTANCES: true
+
+      # Timezone
+      TZ: America/Sao_Paulo
+
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: salestra-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "ollama", "list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  evolution_instances:
+  evolution_store:
+  ollama_data:

@@ -1,0 +1,277 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { MessageSquare, ArrowRight } from 'lucide-react'
+import Sidebar from '../../../components/Sidebar'
+
+export default function ConversationsListPage() {
+    const router = useRouter()
+    const [conversations, setConversations] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [filter, setFilter] = useState('all') // all, unread, resolved
+    const [searchQuery, setSearchQuery] = useState('')
+
+    useEffect(() => {
+        const token = localStorage.getItem('token')
+        if (!token) {
+            router.push('/login')
+            return
+        }
+
+        // Initial fetch
+        fetchConversations(token)
+
+        // 📡 REAL-TIME SSE CONNECTION for instant updates
+        console.log('🔌 Establishing SSE connection for real-time updates...')
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const eventSource = new EventSource(`${apiUrl}/api/sse/conversations`, {
+            withCredentials: false // JWT is in URL or will need custom headers (EventSource limitation)
+        })
+
+        // NOTE: EventSource doesn't support custom headers, so we'll use token in URL
+        // Alternative: Use fetch API with SSE manually, but EventSource is simpler
+        // For now, we'll modify backend to accept token from query param for SSE only
+
+        // Better approach: Reconnect with token
+        const sseUrl = `${apiUrl}/api/sse/conversations?token=${encodeURIComponent(token)}`
+        const sse = new EventSource(sseUrl)
+
+        sse.onopen = () => {
+            console.log('✅ SSE connection established')
+        }
+
+        sse.addEventListener('connected', (event) => {
+            const data = JSON.parse(event.data)
+            console.log('🎉 SSE connected:', data)
+        })
+
+        sse.addEventListener('new-message', (event) => {
+            const data = JSON.parse(event.data)
+            console.log('⚡ INSTANT UPDATE: New message received!', data)
+            // Instantly refresh conversations
+            fetchConversations(token, true)
+        })
+
+        sse.addEventListener('heartbeat', (event) => {
+            const data = JSON.parse(event.data)
+            console.log('💓 SSE heartbeat:', data.timestamp)
+        })
+
+        sse.onerror = (error) => {
+            console.error('❌ SSE connection error:', error)
+            // EventSource will automatically try to reconnect
+        }
+
+        // 🔄 Backup polling (60 seconds) in case SSE fails
+        const backupInterval = setInterval(() => {
+            console.log('🔄 [Backup polling] Fetching conversations...')
+            const currentToken = localStorage.getItem('token')
+            if (currentToken) {
+                fetchConversations(currentToken, true)
+            }
+        }, 60000) // 60 seconds backup
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🔌 Closing SSE connection')
+            sse.close()
+            clearInterval(backupInterval)
+        }
+    }, [])
+
+    const fetchConversations = async (token: string, silent = false) => {
+        try {
+            if (!silent) {
+                setLoading(true)
+            } else {
+                setIsRefreshing(true)
+            }
+
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+            const response = await fetch(`${apiUrl}/api/conversations`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+
+            console.log('📡 [Frontend] API Response:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: `${apiUrl}/api/conversations`
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                console.log('✅ [Frontend] Conversations data:', data)
+                setConversations(data.conversations || [])
+            } else {
+                const errorText = await response.text()
+                console.error('❌ [Frontend] API Error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText
+                })
+                if (!silent) {
+                    setConversations([])
+                }
+            }
+        } catch (error) {
+            console.error('❌ [Frontend] Fetch error:', error)
+            if (!silent) {
+                setConversations([])
+            }
+        } finally {
+            setLoading(false)
+            setIsRefreshing(false)
+        }
+    }
+
+    const handleLogout = () => {
+        localStorage.clear()
+        router.push('/login')
+    }
+
+    const filteredConversations = conversations.filter(conv => {
+        const matchesFilter = filter === 'all' ||
+            (filter === 'unread' && conv.unreadCount > 0) ||
+            (filter === 'resolved' && conv.status === 'resolved')
+
+        const matchesSearch = searchQuery === '' ||
+            conv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            conv.customerPhone.includes(searchQuery)
+
+        return matchesFilter && matchesSearch
+    })
+
+    return (
+        <div className="flex h-screen bg-gray-50" suppressHydrationWarning>
+            <Sidebar onLogout={handleLogout} />
+
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Header */}
+                <header className="bg-white border-b border-gray-200 px-8 py-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-bold text-gray-900">All Conversations</h1>
+                                {isRefreshing && (
+                                    <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+                                        <span className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse"></span>
+                                        Live
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Manage and monitor all customer interactions
+                            </p>
+                        </div>
+                        <Link
+                            href="/dashboard"
+                            className="text-emerald-600 hover:text-emerald-700 font-medium text-sm inline-flex items-center gap-1"
+                        >
+                            Back to Dashboard
+                            <ArrowRight className="w-4 h-4" />
+                        </Link>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex items-center gap-4 mt-6">
+                        <input
+                            type="text"
+                            placeholder="Search conversations..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="flex-1 max-w-md px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                        />
+                        <div className="flex gap-2">
+                            {['all', 'unread', 'resolved'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`px-4 py-2 rounded-lg font-medium text-sm capitalize transition-colors ${filter === f
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {f}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </header>
+
+                {/* Conversations List */}
+                <div className="flex-1 overflow-y-auto p-8">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                    ) : filteredConversations.length > 0 ? (
+                        <div className="space-y-4">
+                            {filteredConversations.map(conv => (
+                                <div
+                                    key={conv.id}
+                                    className="bg-white rounded-xl border border-gray-200 p-6 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer"
+                                    onClick={() => {/* TODO: Open conversation detail */ }}
+                                >
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <span className="text-emerald-700 font-semibold text-lg">
+                                                    {conv.customerName.charAt(0).toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-gray-900 text-lg">{conv.customerName}</h3>
+                                                <p className="text-sm text-gray-500">{conv.customerPhone}</p>
+                                                <div className="flex items-center gap-3 mt-2">
+                                                    <span className="text-xs text-gray-500">{conv.timestamp}</span>
+                                                    <span className="text-xs text-gray-400">•</span>
+                                                    <span className="text-xs text-gray-500">{conv.messageCount} messages</span>
+                                                    {conv.unreadCount > 0 && (
+                                                        <>
+                                                            <span className="text-xs text-gray-400">•</span>
+                                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                                                                {conv.unreadCount} new
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${conv.status === 'resolved'
+                                            ? 'bg-gray-100 text-gray-600'
+                                            : 'bg-emerald-100 text-emerald-700'
+                                            }`}>
+                                            {conv.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-sm font-medium text-gray-700">Customer:</span>
+                                            <p className="text-sm text-gray-600 flex-1">{conv.lastMessage}</p>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <MessageSquare className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                                            <p className="text-sm text-emerald-700 flex-1">{conv.aiResponse}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12">
+                            <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                            <p className="text-gray-600">No conversations found</p>
+                            <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}

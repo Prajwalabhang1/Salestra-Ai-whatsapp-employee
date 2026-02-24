@@ -1,0 +1,161 @@
+# Dependencies
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+prisma/migrations/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+tmp/
+temp/
+
+# Test & Debug Files (NEW)
+test-*.ts
+test-*.js
+test-*.mjs
+check-*.ts
+check-*.js
+check-*.mjs
+debug-*.ts
+debug-*.js
+debug-*.mjs
+diagnose-*.ts
+diagnose-*.js
+diagnose-*.mjs
+*-debug.ts
+*-debug.js
+*-debug.mjs
+analyze-*.ts
+analyze-*.js
+analyze-*.mjs
+inspect-*.ts
+inspect-*.js
+inspect-*.mjs
+find-*.ts
+find-*.js
+find-*.mjs
+fix-*.ts
+fix-*.js
+delete-*.ts
+cleanup-*.ts
+verify-*.ts
+generate-*.ts
+list-*.ts
+monitor-*.ts
+read-*.ts
+reset-*.ts
+send-*.ts
+show-*.ts
+show-*.mjs
+manual-*.ts
+complete-*.ts
+simple-*.ts
+extract-*.mjs
+force-*.ts
+
+# Temporary Output Files (NEW)
+*.txt
+!README.txt
+!QUICKSTART.txt
+database-*.json
+instances*.json
+found_*.json
+*_output.txt
+*_dump.txt
+*_debug*.txt
+*-output.txt
+*-result.txt
+*-analysis.txt
+*-check.txt
+flow_*.json
+flow_*.log
+tenant_info_dump.json
+tenants-dump.txt
+conversations_list.txt
+message-ids.txt
+
+# Archive (NEW)
+_archive/
+_old/
+_backup/
+
+# Worker & Queue Debug
+worker-*.log
+queue_*.txt
+sim_*.txt
+result_*.txt
+startup-log.txt
+webhook-payloads*.log
+lid-output.txt
+latest_webhooks.txt
+
+# Additional Debug Script Patterns
+investigate-*.ts
+investigate-*.js
+get-*.ts
+get-*.js
+get-*.sql
+sync-*.ts
+sync-*.js
+production-*.ts
+production-*.js
+pipeline-*.ts
+pipeline-*.js
+pipeline-*.json
+quick-*.ts
+quick-*.js
+setup-*.ts
+complete-*.ts
+complete-*.js
+clear-*.ts
+clear-*.js
+final-*.ts
+final-*.js
+startup*.log
+startup*.txt
+backend_debug*.log
+backend_final.log
+backend_startup.log
+backend-log.txt

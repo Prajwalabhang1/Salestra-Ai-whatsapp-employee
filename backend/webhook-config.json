@@ -1,0 +1,9 @@
+{
+    "url": "http://localhost:3000/api/webhooks/whatsapp",
+    "enabled": true,
+    "events": [
+        "messages.upsert",
+        "connection.update",
+        "messages.update"
+    ]
+}
